@@ -1,7 +1,12 @@
-import { GoogleGenAI } from "@google/genai";
+import OpenAI from "openai";
 import { SimulationPoint, TreatmentType, CaseConfig, CaseType } from "../types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Initialize OpenAI Client
+// Note: "dangerouslyAllowBrowser: true" is required for client-side usage.
+const openai = new OpenAI({
+  apiKey: import.meta.env.VITE_OPENAI_API_KEY, 
+  dangerouslyAllowBrowser: true
+});
 
 export const analyzeSimulation = async (
   data: SimulationPoint[],
@@ -9,7 +14,7 @@ export const analyzeSimulation = async (
   caseConfig: CaseConfig
 ): Promise<string> => {
   
-  // Prepare a textual summary of the data for the model
+  // --- Data Preparation Logic ---
   const finalPoint = data[data.length - 1];
   const startVal = data[0].history ? Math.round(data[0].history) : "Unknown";
   // Intervention is at Hour 8
@@ -29,7 +34,7 @@ export const analyzeSimulation = async (
       }
   }
 
-  // Specific clinical logic based on the user's provided research context
+  // --- Clinical Context Logic ---
   const isGlucose = caseConfig.id === CaseType.GLUCOSE;
   
   const scientificContext = isGlucose 
@@ -69,21 +74,30 @@ export const analyzeSimulation = async (
     - NO Markdown (**bold**, *italics*). Plain text only.
   `;
 
+  // --- OpenAI API Call ---
   try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-pro-preview',
-      contents: prompt,
-      config: {
-        thinkingConfig: { thinkingBudget: 1024 }
-      }
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o", 
+      messages: [
+        {
+          role: "system",
+          content: "You are a professional medical AI assistant."
+        },
+        {
+          role: "user",
+          content: prompt
+        }
+      ],
+      temperature: 0.7,
     });
     
-    let text = response.text || "Unable to generate analysis.";
+    let text = response.choices[0].message.content || "Unable to generate analysis.";
+    // Clean up any potential markdown symbols
     text = text.replace(/\*\*/g, '').replace(/\*/g, '');
     
     return text;
   } catch (error) {
-    console.error("Gemini Error:", error);
+    console.error("OpenAI Error:", error);
     return "AI Analysis service is temporarily unavailable.";
   }
 };
