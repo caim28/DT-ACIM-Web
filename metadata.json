@@ -1,0 +1,5 @@
+{
+  "name": "DT-ACIM",
+  "description": "Digital Twin–Anchored Acute Care Intervention Model - A clinical decision support system simulating patient outcomes using probabilistic modeling and GenAI analysis.",
+  "requestFramePermissions": []
+}
