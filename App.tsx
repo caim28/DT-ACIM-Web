@@ -187,7 +187,7 @@ const InfoModal = ({ onClose }: { onClose: () => void }) => (
               <span className="font-semibold text-blue-600">RAS + Metoprolol</span>: Cardioselective β1-blocker.
             </li>
             <li>
-              <span className="font-semibold text-green-600">RAS + Carvedilol</span>: Non-selective β-blocker with insulin-sensitizing properties.
+              <span className="font-semibold text-green-600">RAS + Carvedilol</span>: Non-selective α1/β-blocker with insulin-sensitizing properties.
             </li>
           </ul>
         </section>
@@ -214,6 +214,7 @@ const App: React.FC = () => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [variance, setVariance] = useState(30);
   const [showInfo, setShowInfo] = useState(true);
+  const [activeTab, setActiveTab] = useState<'sim' | 'rpt' | 'set'>('sim');
 
   // Use useCallback to define the simulation runner
   const runSimulation = useCallback(() => {
@@ -262,7 +263,7 @@ const App: React.FC = () => {
         <nav className="flex flex-col gap-4 w-full px-2">
           <button 
             onClick={() => setShowInfo(true)}
-            className="flex flex-col items-center gap-1 p-2 rounded-lg text-indigo-600 bg-indigo-50 hover:bg-indigo-100 transition-colors group"
+            className="flex flex-col items-center gap-1 p-2 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-colors group"
             title="Study Guide & Protocol"
           >
             <BookOpen className="w-5 h-5" />
@@ -271,15 +272,29 @@ const App: React.FC = () => {
           
           <div className="w-full h-px bg-slate-100 my-1"></div>
 
-          <button className="flex flex-col items-center gap-1 p-2 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-colors" title="Simulations">
+          <button 
+            onClick={() => setActiveTab('sim')}
+            className={`flex flex-col items-center gap-1 p-2 rounded-lg transition-colors ${activeTab === 'sim' ? 'text-indigo-600 bg-indigo-50' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}
+            title="Simulations"
+          >
             <BrainCircuit className="w-5 h-5" />
             <span className="text-[9px] font-medium">Sim</span>
           </button>
-          <button className="flex flex-col items-center gap-1 p-2 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-colors" title="Reports">
+          
+          <button 
+            onClick={() => setActiveTab('rpt')}
+            className={`flex flex-col items-center gap-1 p-2 rounded-lg transition-colors ${activeTab === 'rpt' ? 'text-indigo-600 bg-indigo-50' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}
+            title="Reports"
+          >
             <FileText className="w-5 h-5" />
             <span className="text-[9px] font-medium">Rpt</span>
           </button>
-          <button className="flex flex-col items-center gap-1 p-2 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-colors" title="Settings">
+          
+          <button 
+            onClick={() => setActiveTab('set')}
+            className={`flex flex-col items-center gap-1 p-2 rounded-lg transition-colors ${activeTab === 'set' ? 'text-indigo-600 bg-indigo-50' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}
+            title="Settings"
+          >
             <Settings className="w-5 h-5" />
             <span className="text-[9px] font-medium">Set</span>
           </button>
@@ -471,7 +486,7 @@ const App: React.FC = () => {
                     </div>
                     <div className="flex flex-col">
                       <span className="text-sm font-bold text-slate-700">RAS + Carvedilol</span>
-                      <span className="text-[10px] text-slate-400">Non-selective β-blocker</span>
+                      <span className="text-[10px] text-slate-400">Non-selective α/β-blocker</span>
                     </div>
                   </div>
                   <input type="checkbox" className="hidden" checked={activeTreatments.includes(TreatmentType.CARVEDILOL)} onChange={() => toggleTreatment(TreatmentType.CARVEDILOL)} />
