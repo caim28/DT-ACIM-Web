@@ -12,7 +12,8 @@ import {
   BookOpen,
   X,
   HelpCircle,
-  FlaskConical
+  FlaskConical,
+  User
 } from 'lucide-react';
 
 import SimulationChart from './components/SimulationChart';
@@ -25,7 +26,7 @@ const CASE_CONFIGS: Record<CaseType, CaseConfig> = {
     label: "Blood Glucose",
     unit: "mg/dL",
     yAxisDomain: [150, 750], 
-    description: "T2DM + HTN (GEMINI Trial Context). 55M. Hour 1: Insulin. Hour 8: RAS + Beta Blockers.",
+    description: "55M, T2DM + HTN. H1: Insulin. H8: RAS + Beta Blockers. Data: SICdb.",
     patientId: "856091",
     primaryCondition: "Hyperglycemia"
   },
@@ -34,7 +35,7 @@ const CASE_CONFIGS: Record<CaseType, CaseConfig> = {
     label: "Diastolic BP",
     unit: "mmHg",
     yAxisDomain: [58, 88], 
-    description: "T2DM + HTN (GEMINI Trial Context). 55M. Hour 1: Insulin. Hour 8: RAS + Beta Blockers.",
+    description: "55M, T2DM + HTN. H1: Insulin. H8: RAS + Beta Blockers. Data: SICdb.",
     patientId: "856091",
     primaryCondition: "Hypertension"
   }
@@ -144,27 +145,34 @@ const InfoModal = ({ onClose }: { onClose: () => void }) => (
         <section>
           <h3 className="font-bold text-slate-900 mb-2 flex items-center gap-2">
             <Activity className="w-4 h-4 text-indigo-600" />
-            System Purpose
+            Study Setup
           </h3>
           <p className="text-sm leading-relaxed">
-            This tool uses a probabilistic <strong>Digital Twin</strong> model to simulate counterfactual patient outcomes. 
-            It allows clinicians to compare the projected physiological trajectory of a specific patient under different 
-            pharmacological interventions (specifically Beta-Blockers) alongside standard care.
+            In our setup, we model the treatment trajectory of a simulated 55-year-old male patient diagnosed with <strong>type 2 diabetes mellitus and hypertension</strong>. 
+            At baseline, the patient suffers from severely elevated blood glucose levels (approximately 700 mg/dL) and a DBP of around 75 mmHg. 
           </p>
+          <div className="mt-3 p-3 bg-slate-50 border border-slate-100 rounded-md text-sm">
+             <ul className="list-disc pl-5 space-y-1">
+                <li><strong>Hour 1:</strong> Insulin administered to manage hyperglycemia.</li>
+                <li><strong>Hour 8:</strong> Counterfactual strategies applied (RAS + Beta-Blockers).</li>
+             </ul>
+          </div>
         </section>
 
         <section className="grid grid-cols-2 gap-6">
           <div className="bg-slate-50 p-4 rounded-lg border border-slate-100">
-            <h4 className="font-semibold text-xs uppercase tracking-wider text-slate-500 mb-2">Study Population</h4>
+            <h4 className="font-semibold text-xs uppercase tracking-wider text-slate-500 mb-2">Data Source</h4>
             <p className="text-sm">
-              T2DM (Type 2 Diabetes) + Hypertension patients exhibiting acute dysregulation. Based on GEMINI trial datasets.
+              <strong>SICdb</strong><br/>
+              Salzburg Intensive Care database.
+              <span className="text-xs text-slate-400 block mt-1">Experimental design referenced from GEMINI trial structure.</span>
             </p>
           </div>
           <div className="bg-slate-50 p-4 rounded-lg border border-slate-100">
-            <h4 className="font-semibold text-xs uppercase tracking-wider text-slate-500 mb-2">Key Terminology (RAS)</h4>
+            <h4 className="font-semibold text-xs uppercase tracking-wider text-slate-500 mb-2">Key Terminology</h4>
             <p className="text-sm">
               <strong>RAS</strong> = Renin-Angiotensin System Blockers (ACEi or ARBs). 
-              <br/><span className="text-xs text-slate-500 mt-1 block">Standard background therapy for all simulation arms.</span>
+              <br/><span className="text-xs text-slate-500 mt-1 block">Lowers vascular resistance.</span>
             </p>
           </div>
         </section>
@@ -172,14 +180,14 @@ const InfoModal = ({ onClose }: { onClose: () => void }) => (
         <section>
           <h3 className="font-bold text-slate-900 mb-2">Intervention Protocol (Hour 8)</h3>
           <p className="text-sm leading-relaxed mb-3">
-            The simulation observes patient history from Hour 1-8 (Pre-intervention). At Hour 8, the model branches into two counterfactuals:
+             At Hour 8, the model branches into two counterfactuals. Both regimens include background RAS blockers:
           </p>
           <ul className="text-sm space-y-2 list-disc pl-5">
             <li>
               <span className="font-semibold text-blue-600">RAS + Metoprolol</span>: Cardioselective β1-blocker.
             </li>
             <li>
-              <span className="font-semibold text-green-600">RAS + Carvedilol</span>: Non-selective α1/β-blocker with insulin-sensitizing properties.
+              <span className="font-semibold text-green-600">RAS + Carvedilol</span>: Non-selective β-blocker with insulin-sensitizing properties.
             </li>
           </ul>
         </section>
@@ -317,12 +325,14 @@ const App: React.FC = () => {
              <div className="flex flex-col items-end">
                 <div className="flex items-center gap-2 text-xs text-slate-600">
                   <span className="font-bold text-slate-900">Patient ID: {activeConfig.patientId}</span>
-                  <span className="px-1.5 py-0.5 rounded bg-slate-100 border border-slate-200 text-[10px] font-mono">GEMINI-COHORT-A</span>
+                  <span className="px-1.5 py-0.5 rounded bg-slate-100 border border-slate-200 text-[10px] font-mono">SICdb-COHORT</span>
                 </div>
                 <span className="text-[10px] text-slate-400 mt-0.5">Primary Dx: {activeConfig.primaryCondition}</span>
              </div>
              <div className="h-8 w-8 rounded-full bg-slate-200 border-2 border-white shadow-sm overflow-hidden">
-                <div className="w-full h-full bg-indigo-600 flex items-center justify-center text-white text-xs font-bold">MD</div>
+                <div className="w-full h-full bg-indigo-600 flex items-center justify-center text-white">
+                  <User className="w-4 h-4" />
+                </div>
              </div>
           </div>
         </header>
@@ -513,7 +523,7 @@ const App: React.FC = () => {
                  {activeTreatments.includes(TreatmentType.METOPROLOL) && (
                    <div className="flex justify-between items-center p-3 bg-blue-50/20 rounded-lg border border-blue-100">
                       <div className="flex flex-col">
-                        <span className="text-xs font-semibold text-blue-700">Metoprolol (Sim)</span>
+                        <span className="text-xs font-semibold text-blue-700">RAS + Metoprolol</span>
                         <span className="text-[9px] text-blue-400">Counterfactual A</span>
                       </div>
                       <span className="text-sm font-bold text-slate-700 font-mono">
@@ -525,7 +535,7 @@ const App: React.FC = () => {
                  {activeTreatments.includes(TreatmentType.CARVEDILOL) && (
                    <div className="flex justify-between items-center p-3 bg-green-50/20 rounded-lg border border-green-100">
                       <div className="flex flex-col">
-                        <span className="text-xs font-semibold text-green-700">Carvedilol (Sim)</span>
+                        <span className="text-xs font-semibold text-green-700">RAS + Carvedilol</span>
                         <span className="text-[9px] text-green-400">Counterfactual B</span>
                       </div>
                       <span className="text-sm font-bold text-slate-700 font-mono">
