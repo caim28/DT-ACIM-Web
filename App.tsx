@@ -471,7 +471,7 @@ const App: React.FC = () => {
                     </div>
                     <div className="flex flex-col">
                       <span className="text-sm font-bold text-slate-700">RAS + Carvedilol</span>
-                      <span className="text-[10px] text-slate-400">Non-selective α/β-blocker</span>
+                      <span className="text-[10px] text-slate-400">Non-selective β-blocker</span>
                     </div>
                   </div>
                   <input type="checkbox" className="hidden" checked={activeTreatments.includes(TreatmentType.CARVEDILOL)} onChange={() => toggleTreatment(TreatmentType.CARVEDILOL)} />
