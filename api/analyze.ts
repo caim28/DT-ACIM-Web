@@ -100,6 +100,29 @@ const getPublicErrorMessage = (status: number, model: string): string => {
   return "AI Analysis service is temporarily unavailable.";
 };
 
+const getMessageText = (content: unknown): string => {
+  if (typeof content === "string") {
+    return content.trim();
+  }
+
+  if (Array.isArray(content)) {
+    return content
+      .map((part) => {
+        if (typeof part === "string") {
+          return part;
+        }
+        if (part && typeof part === "object" && "text" in part) {
+          return String((part as { text?: unknown }).text || "");
+        }
+        return "";
+      })
+      .join("")
+      .trim();
+  }
+
+  return "";
+};
+
 export default async function handler(req: any, res: any) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed." });
@@ -149,9 +172,15 @@ export default async function handler(req: any, res: any) {
       ],
       temperature: 0.7,
       max_tokens: 350,
-    });
+      reasoning_effort: "none",
+    } as any);
 
-    const analysis = completion.choices[0]?.message?.content || "Unable to generate analysis.";
+    const message = completion.choices[0]?.message as { content?: unknown; reasoning_content?: unknown } | undefined;
+    const analysis =
+      getMessageText(message?.content) ||
+      getMessageText(message?.reasoning_content) ||
+      "Unable to generate analysis.";
+
     return res.status(200).json({
       analysis: analysis.replace(/\*\*/g, "").replace(/\*/g, ""),
     });
