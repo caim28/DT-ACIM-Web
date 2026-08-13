@@ -1,14 +1,11 @@
 import OpenAI from "openai";
-import {
-  CaseType,
-  TreatmentType,
-  type AnalyzeSimulationRequest,
-  type CaseConfig,
-  type SimulationPoint,
-} from "../types";
+import type { AnalyzeSimulationRequest, CaseConfig, SimulationPoint } from "../types";
 
 const DEFAULT_SOCLAAS_URL = "https://soclaas-api.comp.nus.edu.sg";
 const DEFAULT_SOCLAAS_MODEL = "qwen3.5:9b";
+const GLUCOSE_CASE_ID = "GLUCOSE";
+const METOPROLOL_TREATMENT = "Metoprolol";
+const CARVEDILOL_TREATMENT = "Carvedilol";
 
 const normalizeBaseURL = (url: string): string => {
   const trimmed = url.trim().replace(/\/+$/, "");
@@ -29,7 +26,7 @@ const hasValidBody = (body: Partial<AnalyzeSimulationRequest> | undefined): body
 
 const buildClinicalPrompt = (
   data: SimulationPoint[],
-  activeTreatments: TreatmentType[],
+  activeTreatments: string[],
   caseConfig: CaseConfig,
 ): string => {
   const finalPoint = data[data.length - 1];
@@ -43,15 +40,15 @@ const buildClinicalPrompt = (
   summary += "POST-INTERVENTION SIMULATION (Hour 9-13) [RAS Blocker + Beta Blocker]:\n";
 
   if (finalPoint) {
-    if (activeTreatments.includes(TreatmentType.METOPROLOL)) {
+    if (activeTreatments.includes(METOPROLOL_TREATMENT)) {
       summary += `- RAS + Metoprolol: projected end mean ~${Math.round(finalPoint.metoprolol_mean || 0)} ${caseConfig.unit}.\n`;
     }
-    if (activeTreatments.includes(TreatmentType.CARVEDILOL)) {
+    if (activeTreatments.includes(CARVEDILOL_TREATMENT)) {
       summary += `- RAS + Carvedilol: projected end mean ~${Math.round(finalPoint.carvedilol_mean || 0)} ${caseConfig.unit}.\n`;
     }
   }
 
-  const isGlucose = caseConfig.id === CaseType.GLUCOSE;
+  const isGlucose = caseConfig.id === GLUCOSE_CASE_ID;
   const scientificContext = isGlucose
     ? "Context: Carvedilol has insulin-sensitizing effects, leading to better stability. Metoprolol is associated with impaired glucose metabolism, causing variability/upward drift."
     : "Context: Both drugs (Metoprolol/Carvedilol) are effective for BP. Clinical trials show they are nearly indistinguishable in hemodynamic control.";
