@@ -36,3 +36,14 @@ export interface SimulationConfig {
   variance: number; // Randomness factor
   interventionHour: number;
 }
+
+export interface AnalyzeSimulationRequest {
+  data: SimulationPoint[];
+  activeTreatments: TreatmentType[];
+  caseConfig: CaseConfig;
+}
+
+export interface AnalyzeSimulationResponse {
+  analysis?: string;
+  error?: string;
+}
