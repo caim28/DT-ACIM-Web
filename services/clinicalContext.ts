@@ -1,4 +1,4 @@
-import { CaseType, TreatmentType, type AnalyzeSimulationRequest, type InformationCondition } from '../types';
+import type { AnalyzeSimulationRequest, InformationCondition } from '../types';
 
 export const getHistoryContext = (condition: InformationCondition): string =>
   condition === 'key-history-missing'
@@ -15,13 +15,13 @@ export const getEvidenceContext = (condition: InformationCondition): string => {
 export const buildDemoReport = ({ data, activeTreatments, caseConfig, informationCondition = 'history-available' }: AnalyzeSimulationRequest): string => {
   const last = data.at(-1);
   const options = [
-    activeTreatments.includes(TreatmentType.METOPROLOL) && last?.metoprolol_mean != null
+    activeTreatments.some(treatment => treatment === 'Metoprolol') && last?.metoprolol_mean != null
       ? `RAS + Metoprolol: ${last.metoprolol_mean.toFixed(1)} ${caseConfig.unit}` : '',
-    activeTreatments.includes(TreatmentType.CARVEDILOL) && last?.carvedilol_mean != null
+    activeTreatments.some(treatment => treatment === 'Carvedilol') && last?.carvedilol_mean != null
       ? `RAS + Carvedilol: ${last.carvedilol_mean.toFixed(1)} ${caseConfig.unit}` : '',
   ].filter(Boolean);
   const comparison = options.length === 2
-    ? caseConfig.id === CaseType.GLUCOSE
+    ? caseConfig.id === 'GLUCOSE'
       ? 'The carvedilol pathway has a lower displayed glucose endpoint than the metoprolol pathway.'
       : 'The two displayed diastolic blood pressure endpoints are closely aligned.'
     : 'Select both pathways to compare their displayed outcomes.';

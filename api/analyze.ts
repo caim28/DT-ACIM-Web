@@ -1,5 +1,5 @@
 import OpenAI from "openai";
-import { getHistoryContext, getEvidenceContext } from "../services/clinicalContext";
+import { getHistoryContext, getEvidenceContext } from "../services/clinicalContext.js";
 import type { AnalyzeSimulationRequest, CaseConfig, SimulationPoint, InformationCondition } from "../types";
 
 const DEFAULT_SOCLAAS_URL = "https://soclaas-api.comp.nus.edu.sg";
