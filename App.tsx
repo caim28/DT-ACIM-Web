@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Activity, 
   BrainCircuit, 
@@ -207,31 +207,26 @@ const InfoModal = ({ onClose }: { onClose: () => void }) => (
 
 const App: React.FC = () => {
   const [currentCase, setCurrentCase] = useState<CaseType>(CaseType.GLUCOSE);
-  const [data, setData] = useState<SimulationPoint[]>([]);
+  const data = useMemo(() => generateData(currentCase, { runs: 0, variance: 0 }), [currentCase]);
   const [activeTreatments, setActiveTreatments] = useState<TreatmentType[]>([TreatmentType.METOPROLOL, TreatmentType.CARVEDILOL]);
-  const [isSimulating, setIsSimulating] = useState(false);
+  const reportRequest = useRef(0);
   const [aiAnalysis, setAiAnalysis] = useState<string>("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [variance, setVariance] = useState(30);
+  const [variance, setVariance] = useState(25);
   const [showInfo, setShowInfo] = useState(true);
   const [activeTab, setActiveTab] = useState<'sim' | 'rpt' | 'set'>('sim');
 
-  // Use useCallback to define the simulation runner
-  const runSimulation = useCallback(() => {
-    setIsSimulating(true);
-    setAiAnalysis(""); 
-    // Reduced timeout for snappier UI when dragging slider
-    setTimeout(() => {
-      const newData = generateData(currentCase, { runs: 20, variance: variance });
-      setData(newData);
-      setIsSimulating(false);
-    }, 200);
-  }, [variance, currentCase]);
+  const informationCondition = variance === 25 ? 'history-available' : 'key-history-missing';
 
-  // EFFECT: Automatically run simulation when Case OR Variance changes
+  const runSimulation = () => {
+    reportRequest.current += 1;
+    setAiAnalysis('');
+    setIsAnalyzing(false);
+  };
+
   useEffect(() => {
     runSimulation();
-  }, [runSimulation]); // Now depends on runSimulation which changes when variance changes
+  }, [variance, currentCase, activeTreatments]);
 
   const toggleTreatment = (t: TreatmentType) => {
     setActiveTreatments(prev => 
@@ -242,9 +237,12 @@ const App: React.FC = () => {
   const handleAIAnalysis = async () => {
     if (data.length === 0) return;
     setIsAnalyzing(true);
-    const result = await analyzeSimulation(data, activeTreatments, CASE_CONFIGS[currentCase]);
-    setAiAnalysis(result);
-    setIsAnalyzing(false);
+    const requestId = ++reportRequest.current;
+    const result = await analyzeSimulation(data, activeTreatments, CASE_CONFIGS[currentCase], informationCondition);
+    if (requestId === reportRequest.current) {
+      setAiAnalysis(result);
+      setIsAnalyzing(false);
+    }
   };
 
   const activeConfig = CASE_CONFIGS[currentCase];
@@ -366,7 +364,7 @@ const App: React.FC = () => {
                     Longitudinal Projection (13 Hours)
                   </h2>
                   <p className="text-[10px] text-slate-400 mt-0.5">
-                    Visualizing counterfactual trajectories against observed history.
+                    Solid red: observed history (H1–8) · Dashed red: post-decision reference · Blue/green: simulated futures.
                   </p>
                 </div>
                
@@ -381,11 +379,11 @@ const App: React.FC = () => {
                   </div>
                   <button 
                     onClick={runSimulation}
-                    disabled={isSimulating}
+                    disabled={isAnalyzing}
                     className="text-xs flex items-center gap-1.5 text-indigo-600 hover:bg-indigo-50 px-3 py-1.5 rounded-md transition-colors font-medium border border-transparent hover:border-indigo-100"
                   >
-                    <RefreshCw className={`w-3.5 h-3.5 ${isSimulating ? 'animate-spin' : ''}`} />
-                    {isSimulating ? 'Processing...' : 'Recalculate'}
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    Recalculate
                   </button>
                 </div>
               </div>
@@ -395,6 +393,7 @@ const App: React.FC = () => {
                   activeTreatments={activeTreatments} 
                   unit={activeConfig.unit}
                   yDomain={activeConfig.yAxisDomain}
+                  illustrativeVariance={variance}
                 />
               </div>
             </div>
@@ -411,13 +410,13 @@ const App: React.FC = () => {
                      <BrainCircuit className="w-4 h-4" />
                    </div>
                    <div>
-                      <h3 className="font-bold text-slate-800 text-sm">Decision Support Engine</h3>
-                      <p className="text-[10px] text-slate-500">Generative analysis of simulated trajectories</p>
+                      <h3 className="font-bold text-slate-800 text-sm">Clinical Report</h3>
+                      <p className="text-[10px] text-slate-500">Treatment comparison, evidence &amp; clinical context</p>
                    </div>
                  </div>
                  <button 
                     onClick={handleAIAnalysis}
-                    disabled={isAnalyzing || data.length === 0}
+                    disabled={isAnalyzing || data.length === 0 || activeTreatments.length === 0}
                     className="text-xs bg-slate-900 hover:bg-slate-800 text-white font-medium px-4 py-2 rounded-lg transition-all shadow-sm flex items-center gap-2"
                  >
                     {isAnalyzing && <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>}
@@ -433,12 +432,12 @@ const App: React.FC = () => {
                      </div>
                      <div className="mt-3 pt-3 border-t border-slate-200 text-[10px] text-slate-400 flex items-center gap-1">
                         <Info className="w-3 h-3" />
-                        AI-generated insights should be verified against standard clinical guidelines.
+                        Conceptual demo for clinician feedback.
                      </div>
                    </div>
                  ) : (
                    <div className="h-full py-4 flex flex-col items-center justify-center text-slate-400 border-2 border-dashed border-slate-100 rounded-lg">
-                      <span className="italic text-xs">Waiting for analysis request...</span>
+                      <span className="italic text-xs">{activeTreatments.length === 0 ? "Select a treatment pathway to generate a report." : "Generate a report for the selected pathways and information condition."}</span>
                    </div>
                  )}
                </div>
@@ -493,30 +492,46 @@ const App: React.FC = () => {
                 </label>
               </div>
 
-              {/* Stochastic Variance Control */}
+              {/* Model Uncertainty — conceptual information conditions */}
               <div className="mt-6 pt-4 border-t border-slate-100">
                 <div className="flex justify-between items-center mb-2">
                   <div className="flex items-center gap-1.5">
                     <span className="text-xs font-semibold text-slate-700">Model Uncertainty</span>
                     <div className="group relative">
                       <HelpCircle className="w-3 h-3 text-slate-400 cursor-help" />
-                      <div className="absolute bottom-full right-0 mb-2 w-48 bg-slate-800 text-white text-[10px] p-2.5 rounded-lg shadow-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 leading-tight">
-                        Adjusts the stochastic variance in the Monte Carlo simulation (N=20 runs) to visualize potential patient response range.
+                      <div className="absolute bottom-full right-0 mb-2 w-56 bg-slate-800 text-white text-[10px] p-2.5 rounded-lg shadow-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 leading-tight">
+                        These example ranges illustrate how available clinical history can shape the interpretation of future responses. When evidence is limited or a patient differs from previously seen cases, the system should express less confidence and support clinician judgment.
                       </div>
                     </div>
                   </div>
-                  <span className="text-[10px] font-mono font-medium text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">
-                    σ: {variance}%
+                  <span className="text-[10px] font-medium text-indigo-700 bg-indigo-50 border border-indigo-100 rounded px-1.5 py-0.5">Concept</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <button type="button" onClick={() => setVariance(25)} aria-pressed={variance === 25}
+                    className={`px-2 py-2 rounded-md border text-[10px] leading-tight font-semibold transition-colors ${variance === 25 ? 'border-indigo-300 bg-indigo-50 text-indigo-700 ring-1 ring-indigo-100' : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300'}`}>
+                    History available
+                  </button>
+                  <button type="button" onClick={() => setVariance(125)} aria-pressed={variance === 125}
+                    className={`px-2 py-2 rounded-md border text-[10px] leading-tight font-semibold transition-colors ${variance === 125 ? 'border-indigo-300 bg-indigo-50 text-indigo-700 ring-1 ring-indigo-100' : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300'}`}>
+                    Key history missing
+                  </button>
+                </div>
+                <div className="mt-2.5 flex items-center gap-2">
+                  <span className="block w-5 h-3 rounded-sm border border-blue-200" style={{ backgroundColor: 'rgba(59,130,246,0.18)' }}></span>
+                  <span className="text-[10px] text-slate-600 font-medium">
+                    {variance === 25 ? 'Possible future range: narrower' : 'Possible future range: wider'}
                   </span>
                 </div>
-                <input 
-                  type="range" 
-                  min="5" 
-                  max="50" 
-                  value={variance} 
-                  onChange={(e) => setVariance(parseInt(e.target.value))}
-                  className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600 hover:accent-indigo-500"
-                />
+                <div className="mt-2 rounded-md bg-slate-50 border border-slate-100 px-2.5 py-2">
+                  <p className="text-[10px] font-semibold text-slate-700">
+                    {variance === 25 ? 'Relevant treatment history available' : 'Prior treatment response unavailable'}
+                  </p>
+                  <p className="mt-1 text-[10px] text-slate-600 leading-relaxed">
+                    {variance === 25
+                      ? 'The example shows a more focused range when relevant clinical history is available.'
+                      : 'Without prior treatment response, differences between treatments may be harder to interpret from the record alone.'}
+                  </p>
+                </div>
               </div>
             </div>
 
@@ -527,8 +542,8 @@ const App: React.FC = () => {
               <div className="space-y-3 flex-1">
                  <div className="flex justify-between items-center p-3 bg-slate-50 rounded-lg border border-slate-100">
                     <div className="flex flex-col">
-                      <span className="text-xs font-semibold text-slate-600">History (Observed)</span>
-                      <span className="text-[9px] text-slate-400">Actual patient data</span>
+                      <span className="text-xs font-semibold text-slate-600">Post-decision reference</span>
+                      <span className="text-[9px] text-slate-400">Illustrative reference at H13</span>
                     </div>
                     <span className="text-sm font-bold text-red-500 font-mono">
                       {data.length > 0 ? Math.round(data[data.length-1].history!) : '--'} <span className="text-[10px] font-normal text-slate-400 font-sans">{activeConfig.unit}</span>

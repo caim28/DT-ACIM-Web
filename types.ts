@@ -37,10 +37,13 @@ export interface SimulationConfig {
   interventionHour: number;
 }
 
+export type InformationCondition = 'history-available' | 'key-history-missing';
+
 export interface AnalyzeSimulationRequest {
   data: SimulationPoint[];
   activeTreatments: TreatmentType[];
   caseConfig: CaseConfig;
+  informationCondition?: InformationCondition;
 }
 
 export interface AnalyzeSimulationResponse {

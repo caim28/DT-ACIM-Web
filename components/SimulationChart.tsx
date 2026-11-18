@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import {
   ComposedChart,
   Line,
+  Area,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -17,6 +18,7 @@ interface SimulationChartProps {
   activeTreatments: TreatmentType[];
   unit: string;
   yDomain: [number, number];
+  illustrativeVariance: number;
 }
 
 const CustomTooltip = ({ active, payload, label, unit }: any) => {
@@ -29,13 +31,15 @@ const CustomTooltip = ({ active, payload, label, unit }: any) => {
         </p>
         {payload.map((entry: any, index: number) => {
            // Whitelist filtering: Only show the main trend lines, ignore background simulation noise
-           const validKeys = ['history', 'metoprolol_mean', 'carvedilol_mean'];
+           const validKeys = ['history', 'postDecisionReference', 'metoprolol_mean', 'carvedilol_mean'];
            // Check if dataKey is a string and in our whitelist
            const isKeyString = typeof entry.dataKey === 'string';
            if (!isKeyString || !validKeys.includes(entry.dataKey)) return null;
            
            let name = entry.name;
            if (entry.dataKey === 'history') name = 'Observed History';
+           if (entry.dataKey === 'postDecisionReference') name = 'Post-decision reference';
+           if (entry.dataKey === 'postDecisionReference' && label === 8) return null;
            if (entry.dataKey === 'metoprolol_mean') name = 'RAS + Metoprolol';
            if (entry.dataKey === 'carvedilol_mean') name = 'RAS + Carvedilol';
 
@@ -57,11 +61,11 @@ const CustomTooltip = ({ active, payload, label, unit }: any) => {
   return null;
 };
 
-const SimulationChart: React.FC<SimulationChartProps> = ({ data, activeTreatments, unit, yDomain }) => {
+const SimulationChart: React.FC<SimulationChartProps> = ({ data, activeTreatments, unit, yDomain, illustrativeVariance }) => {
   
   const simulationLines = useMemo(() => {
     const lines: React.ReactNode[] = [];
-    const runCount = 20; 
+    const runCount = 0;
 
     // 1. Metoprolol (Blue)
     if (activeTreatments.includes(TreatmentType.METOPROLOL)) {
@@ -135,7 +139,7 @@ const SimulationChart: React.FC<SimulationChartProps> = ({ data, activeTreatment
   return (
     <div className="w-full h-full">
       <ResponsiveContainer width="100%" height="100%">
-        <ComposedChart data={data} margin={{ top: 20, right: 20, left: 0, bottom: 0 }}>
+        <ComposedChart data={data.map(point => ({ ...point, history: point.hour <= 8 ? point.history : null, postDecisionReference: point.hour >= 8 ? point.history : null }))} margin={{ top: 20, right: 20, left: 0, bottom: 12 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
           <XAxis 
             dataKey="hour" 
@@ -167,6 +171,41 @@ const SimulationChart: React.FC<SimulationChartProps> = ({ data, activeTreatment
           
           <ReferenceLine x={8} stroke="#94a3b8" strokeDasharray="3 3" label={{ value: "Intervention", position: 'insideTopLeft', fill: '#94a3b8', fontSize: 11, dy: 5, dx: 5 }} />
 
+
+          {/* Illustrative future ranges; internal lines stay within these bounds */}
+          {activeTreatments.includes(TreatmentType.METOPROLOL) && (
+            <Area type="monotone" dataKey={(point) => {
+              if (point.metoprolol_mean == null) return null;
+              const horizon = Math.max(0, Math.min(1, (point.hour - 8) / 5));
+              const halfWidth = (unit === 'mmHg' ? (illustrativeVariance === 25 ? 1.4 : 5.2) : (illustrativeVariance === 25 ? 14 : 80)) * horizon;
+              return [point.metoprolol_mean - halfWidth, point.metoprolol_mean + halfWidth];
+            }} stroke="none" fill="#3b82f6" fillOpacity={0.17} legendType="none" isAnimationActive={false} />
+          )}
+          {activeTreatments.includes(TreatmentType.CARVEDILOL) && (
+            <Area type="monotone" dataKey={(point) => {
+              if (point.carvedilol_mean == null) return null;
+              const horizon = Math.max(0, Math.min(1, (point.hour - 8) / 5));
+              const halfWidth = (unit === 'mmHg' ? (illustrativeVariance === 25 ? 1.4 : 5.2) : (illustrativeVariance === 25 ? 14 : 80)) * horizon;
+              return [point.carvedilol_mean - halfWidth, point.carvedilol_mean + halfWidth];
+            }} stroke="none" fill="#16a34a" fillOpacity={0.14} legendType="none" isAnimationActive={false} />
+          )}
+          {/* Six evenly spaced, gently colored strands per pathway; no random zig-zags. */}
+          {activeTreatments.includes(TreatmentType.METOPROLOL) && [-0.80, -0.53, -0.27, 0.27, 0.53, 0.80].map((fraction, idx) => (
+            <Line key={`met-range-${idx}`} type="monotone" dataKey={(point) => {
+              if (point.metoprolol_mean == null) return null;
+              const horizon = Math.max(0, Math.min(1, (point.hour - 8) / 5));
+              const halfWidth = (unit === 'mmHg' ? (illustrativeVariance === 25 ? 1.4 : 5.2) : (illustrativeVariance === 25 ? 14 : 80)) * horizon;
+              return point.metoprolol_mean + fraction * halfWidth;
+            }} stroke="#60a5fa" strokeWidth={1.05} strokeOpacity={0.48} dot={false} activeDot={false} legendType="none" isAnimationActive={false} />
+          ))}
+          {activeTreatments.includes(TreatmentType.CARVEDILOL) && [-0.80, -0.53, -0.27, 0.27, 0.53, 0.80].map((fraction, idx) => (
+            <Line key={`carv-range-${idx}`} type="monotone" dataKey={(point) => {
+              if (point.carvedilol_mean == null) return null;
+              const horizon = Math.max(0, Math.min(1, (point.hour - 8) / 5));
+              const halfWidth = (unit === 'mmHg' ? (illustrativeVariance === 25 ? 1.4 : 5.2) : (illustrativeVariance === 25 ? 14 : 80)) * horizon;
+              return point.carvedilol_mean + fraction * halfWidth;
+            }} stroke="#4ade80" strokeWidth={1.05} strokeOpacity={0.44} dot={false} activeDot={false} legendType="none" isAnimationActive={false} />
+          ))}
           {simulationLines}
 
           {/* Observed History / Ground Truth - Rendered last to be on top */}
@@ -179,6 +218,21 @@ const SimulationChart: React.FC<SimulationChartProps> = ({ data, activeTreatment
             activeDot={{ r: 5, strokeWidth: 0 }}
             name="Observed History"
             connectNulls={true}
+          />
+
+          {/* Post-decision reference deliberately distinct from observed patient history */}
+          <Line
+            type="monotone"
+            dataKey="postDecisionReference"
+            stroke="#ef4444"
+            strokeWidth={2}
+            strokeOpacity={0.58}
+            strokeDasharray="6 5"
+            dot={false}
+            activeDot={false}
+            legendType="none"
+            isAnimationActive={false}
+            name="Post-decision reference"
           />
         </ComposedChart>
       </ResponsiveContainer>

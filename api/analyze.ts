@@ -1,5 +1,6 @@
 import OpenAI from "openai";
-import type { AnalyzeSimulationRequest, CaseConfig, SimulationPoint } from "../types";
+import { getHistoryContext, getEvidenceContext } from "../services/clinicalContext";
+import type { AnalyzeSimulationRequest, CaseConfig, SimulationPoint, InformationCondition } from "../types";
 
 const DEFAULT_SOCLAAS_URL = "https://soclaas-api.comp.nus.edu.sg";
 const DEFAULT_SOCLAAS_MODEL = "qwen3.5:9b";
@@ -20,7 +21,8 @@ const hasValidBody = (body: Partial<AnalyzeSimulationRequest> | undefined): body
       body.caseConfig &&
       typeof body.caseConfig.id === "string" &&
       typeof body.caseConfig.label === "string" &&
-      typeof body.caseConfig.unit === "string",
+      typeof body.caseConfig.unit === "string" &&
+      (body.informationCondition === undefined || body.informationCondition === "history-available" || body.informationCondition === "key-history-missing"),
   );
 };
 
@@ -28,6 +30,7 @@ const buildClinicalPrompt = (
   data: SimulationPoint[],
   activeTreatments: string[],
   caseConfig: CaseConfig,
+  informationCondition: InformationCondition = "history-available",
 ): string => {
   const finalPoint = data[data.length - 1];
   const startVal = data[0]?.history ? Math.round(data[0].history) : "Unknown";
@@ -48,43 +51,25 @@ const buildClinicalPrompt = (
     }
   }
 
-  const isGlucose = caseConfig.id === GLUCOSE_CASE_ID;
-  const scientificContext = isGlucose
-    ? "Context: Carvedilol has insulin-sensitizing effects, leading to better stability. Metoprolol is associated with impaired glucose metabolism, causing variability/upward drift."
-    : "Context: Both drugs (Metoprolol/Carvedilol) are effective for BP. Clinical trials show they are nearly indistinguishable in hemodynamic control.";
+  const outcomeContext = caseConfig.id === GLUCOSE_CASE_ID
+    ? "The predefined glucose paths have different endpoints. Describe the displayed difference without inferring a proven individual treatment benefit."
+    : "The predefined diastolic blood pressure paths have similar endpoints. Describe this as a feature of the displayed simulation, not proof of clinical equivalence.";
 
-  return `
-    You are an expert medical presenter demonstrating the "DT-ACIM" system (Digital Twin).
-    Your audience includes doctors viewing a clinical demo based on the GEMINI trial structure.
-
-    Goal: Explain the patient journey, the Insulin effect (H1), and the Beta-blocker comparison (H8-H13).
-
-    Data:
-    ${summary}
-
-    Scientific Knowledge Base:
-    ${scientificContext}
-
-    Structure your response in exactly these 4 short paragraphs (plain text only):
-
-    Patient Status & Initial Care (Hour 1-8):
-    Mention the patient (T2DM & HTN). Explicitly state that INSULIN was administered at Hour 1 to manage the initial severe condition. Describe the trend up to Hour 8.
-
-    Intervention Protocol (Hour 8):
-    Explain that at Hour 8, the regimen shifted to include RAS blockers + a Beta-blocker (Metoprolol vs Carvedilol) to manage the multi-morbid condition.
-
-    Comparative Simulation (Hour 9-13):
-    Analyze the difference between the two curves.
-    ${isGlucose ? "-> HIGHLIGHT that Carvedilol shows better stability due to insulin-sensitizing effects, while Metoprolol shows variability/drift." : "-> HIGHLIGHT that both drugs perform nearly identically for Blood Pressure control, showing they are hemodynamically equivalent."}
-
-    Clinical Recommendation:
-    Conclude which strategy the Digital Twin suggests. ${isGlucose ? "Favor Carvedilol for glycemic control." : "Either is acceptable for BP, so choice depends on metabolic factors."}
-
-    Constraints:
-    - Professional, clinical tone suitable for doctors.
-    - Under 200 words.
-    - NO Markdown (**bold**, *italics*). Plain text only.
-  `;
+  return `You are presenting the DT-ACIM conceptual demo to clinicians.
+Data:
+${summary}
+Information condition:
+${getHistoryContext(informationCondition)}
+Outcome context:
+${outcomeContext}
+Write exactly four short paragraphs, using these headings:
+Patient Status & Initial Care (Hours 1–8): describe the history, with insulin administered at Hour 1 for hyperglycemia.
+Intervention Protocol (Hour 8): describe the displayed RAS blockade and beta-blocker pathways.
+Comparative Simulation (Hours 9–13): use only the selected pathways and endpoint values above. If only one is selected, describe that pathway without comparing it to an unselected one.
+Clinical Interpretation: relate the comparison to the selected information condition and clinical team discussion.
+Use plain text, under 220 words. These are predefined illustrative trajectories and ranges.
+Do not prescribe a treatment, favor a drug by default, invent studies or statistics, or claim the ranges are calibrated confidence intervals. Missing history changes the illustrative range, not the predefined means.
+Do not add an Evidence & Clinical Context section; the application appends that section for the selected information condition.`;
 };
 
 const getPublicErrorMessage = (status: number, model: string): string => {
@@ -167,11 +152,11 @@ export default async function handler(req: any, res: any) {
         },
         {
           role: "user",
-          content: buildClinicalPrompt(requestBody.data, requestBody.activeTreatments, requestBody.caseConfig),
+          content: buildClinicalPrompt(requestBody.data, requestBody.activeTreatments, requestBody.caseConfig, requestBody.informationCondition),
         },
       ],
       temperature: 0.7,
-      max_tokens: 350,
+      max_tokens: 550,
       reasoning_effort: "none",
     } as any);
 
@@ -182,7 +167,7 @@ export default async function handler(req: any, res: any) {
       "Unable to generate analysis.";
 
     return res.status(200).json({
-      analysis: analysis.replace(/\*\*/g, "").replace(/\*/g, ""),
+      analysis: `${analysis.replace(/\*\*/g, "").replace(/\*/g, "")}\n\nEvidence & Clinical Context:\n${getEvidenceContext(requestBody.informationCondition || "history-available")}`,
     });
   } catch (error) {
     const apiError = error as { status?: number; message?: string };
