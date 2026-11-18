@@ -1,5 +1,5 @@
 import OpenAI from "openai";
-import { getHistoryContext, getEvidenceContext } from "../services/clinicalContext.js";
+import { buildDemoReport, getHistoryContext, getEvidenceContext } from "../services/clinicalContext.js";
 import type { AnalyzeSimulationRequest, CaseConfig, SimulationPoint, InformationCondition } from "../types";
 
 const DEFAULT_SOCLAAS_URL = "https://soclaas-api.comp.nus.edu.sg";
@@ -128,7 +128,7 @@ export default async function handler(req: any, res: any) {
 
   const apiKey = process.env.SOCLAAS_API_KEY;
   if (!apiKey) {
-    return res.status(500).json({ error: "SoCLaaS is not configured. Missing SOCLAAS_API_KEY." });
+    return res.status(200).json({ analysis: `Demo report\n\n${buildDemoReport(requestBody)}` });
   }
 
   const model = process.env.SOCLAAS_MODEL || DEFAULT_SOCLAAS_MODEL;
@@ -139,7 +139,8 @@ export default async function handler(req: any, res: any) {
   const client = new OpenAI({
     apiKey,
     baseURL,
-    timeout: 30_000,
+    timeout: 12_000,
+    maxRetries: 0,
   });
 
   try {
@@ -180,6 +181,6 @@ export default async function handler(req: any, res: any) {
       baseURL,
     });
 
-    return res.status(status).json({ error: getPublicErrorMessage(status, model) });
+    return res.status(200).json({ analysis: `Demo report\n\n${buildDemoReport(requestBody)}` });
   }
 }
